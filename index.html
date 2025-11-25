@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Analisis Demografi Hobi — Minimal</title>
+  <style>
+    /* Minimal, modern look */
+    :root{
+      --bg:#f6f8fb; --card:#ffffff; --muted:#6b7280; --accent:#2563eb;
+      --success:#16a34a; --danger:#dc2626;
+    }
+    *{box-sizing:border-box}
+    body{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial; margin:0; background:var(--bg); color:#0f172a}
+    .wrap{max-width:1100px;margin:28px auto;padding:18px}
+    h1{margin:0 0 8px;font-size:20px}
+    p.lead{margin:0 0 18px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:360px 1fr;gap:18px}
+    .card{background:var(--card);border-radius:10px;padding:14px;box-shadow:0 6px 18px rgba(15,23,42,0.06)}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input[type=text], textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef8;background:transparent}
+    .row{display:flex;gap:8px}
+    button{padding:8px 12px;border-radius:8px;border:0;cursor:pointer;background:var(--accent);color:white}
+    button.secondary{background:transparent;border:1px solid #e6eef8;color:var(--muted)}
+    .hobby-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .hobby-pill{padding:6px 10px;border-radius:999px;border:1px solid #e6eef8;background:#fbfdff;cursor:pointer;font-size:13px}
+    .hobby-pill.selected{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .members{max-height:240px;overflow:auto;margin-top:8px}
+    .member-item{padding:8px;border-radius:8px;border:1px solid #f1f5f9;margin-bottom:8px;background:#fff}
+    pre{background:#0f172a;color:#e6eef8;padding:10px;border-radius:8px;white-space:pre-wrap}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    .small{font-size:13px;color:var(--muted)}
+    .topbar{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}
+    .badge{background:#eef2ff;padding:6px 8px;border-radius:999px;font-size:13px;color:var(--accent)}
+    footer{margin-top:14px;color:var(--muted);font-size:13px}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>Analisis Demografi Hobi</h1>
+        <p class="lead">Klik hobi untuk memilih (multi-select). Kemudian pilih operasi: AND (irisan), OR (gabungan), atau A − B (selisih).</p>
+      </div>
+      <div class="badge" id="statsBadge">Hobi: 0 • Anggota unik: 0</div>
+    </div>
+
+    <div class="grid">
+      <!-- Left: Input & hobby palette -->
+      <div>
+        <div class="card">
+          <h3>Tambah / Edit Anggota</h3>
+          <label>Nama</label>
+          <input id="nameInput" placeholder="Contoh: Anna" />
+
+          <label style="margin-top:8px">Hobi (pisahkan koma) <span class="small">— bisa tambah baru</span></label>
+          <input id="hobbiesInput" placeholder="Contoh: Membaca, Game, Coding" />
+
+          <div style="margin-top:10px" class="row">
+            <button id="addBtn">Tambahkan</button>
+            <button id="resetDb" class="secondary">Reset Data</button>
+            <button id="exportBtn" class="secondary">Ekspor JSON</button>
+          </div>
+
+          <div style="margin-top:12px">
+            <label>Palet Hobi (klik untuk pilih operasi)</label>
+            <div id="hobbyPalette" class="hobby-list">
+              <!-- dynamic -->
+            </div>
+            <div class="small" style="margin-top:8px">Klik hobi untuk memilihnya sebagai operand. Klik lagi untuk unselect.</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h3>Data Anggota</h3>
+          <div class="members" id="memberList">
+            <!-- dynamic member list -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Operations & Result -->
+      <div>
+        <div class="card">
+          <h3>Operasi Himpunan</h3>
+
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <button id="opAnd">AND (∩)</button>
+            <button id="opOr" class="secondary">OR (∪)</button>
+            <button id="opDiff" class="secondary">A − B</button>
+            <div style="flex:1"></div>
+            <button id="importBtn" class="secondary">Impor JSON</button>
+            <input type="file" id="fileInput" style="display:none" accept=".json" />
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center">
+            <div style="flex:1">
+              <label>Operand (dipilih dari palet)</label>
+              <div id="chosen" class="hobby-list"></div>
+            </div>
+            <div style="width:180px">
+              <label>Untuk A − B: pilih 2 (A lalu B)</label>
+            </div>
+          </div>
+
+          <div style="margin-top:12px">
+            <label>Hasil</label>
+            <pre id="resultArea">Belum ada operasi yang dijalankan.</pre>
+            <div style="margin-top:8px" class="controls">
+              <button id="copyResult" class="secondary">Salin Hasil</button>
+              <button id="showCount" class="secondary">Tampilkan Statistik</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h3>Visual Singkat</h3>
+          <div class="small">Jumlah orang per hobi</div>
+          <div id="chart" style="margin-top:10px"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <footer>Versi lokal — tidak menyimpan ke server. Cocok untuk demo materi himpunan & analisis tumpang tindih</footer>
+  </div>
+
+  <script>
+    // Data model: key = hobby (lowercase), value = Set of names (Title case)
+    const data = {};
+
+    // Helpers
+    const normalize = s => s.trim().replace(/\s+/g,' ').toLowerCase();
+    const titleCase = s => s.split(' ').map(w => w ? w[0].toUpperCase()+w.slice(1) : '').join(' ');
+    const updateStatsBadge = () => {
+      const hCount = Object.keys(data).length;
+      const people = new Set();
+      Object.values(data).forEach(set => set.forEach(p => people.add(p)));
+      document.getElementById('statsBadge').textContent = `Hobi: ${hCount} • Anggota unik: ${people.size}`;
+    };
+
+    // UI references
+    const hobbyPalette = document.getElementById('hobbyPalette');
+    const memberList = document.getElementById('memberList');
+    const chosenDiv = document.getElementById('chosen');
+    const resultArea = document.getElementById('resultArea');
+    const chartDiv = document.getElementById('chart');
+
+    // Selected hobbies for operations (array preserves order)
+    let selected = [];
+
+    // Render functions
+    function renderPalette(){
+      hobbyPalette.innerHTML = '';
+      const keys = Object.keys(data).sort((a,b)=> data[b].size - data[a].size || a.localeCompare(b));
+      keys.forEach(k => {
+        const pill = document.createElement('div');
+        pill.className = 'hobby-pill' + (selected.includes(k) ? ' selected' : '');
+        pill.textContent = titleCase(k) + ` (${data[k].size})`;
+        pill.onclick = () => {
+          // toggle selection
+          const idx = selected.indexOf(k);
+          if(idx === -1){
+            selected.push(k);
+          } else {
+            selected.splice(idx,1);
+          }
+          renderPalette(); renderChosen();
+        };
+        hobbyPalette.appendChild(pill);
+      });
+      updateStatsBadge();
+      renderChart();
+    }
+
+    function renderMemberList(){
+      memberList.innerHTML = '';
+      const people = new Set();
+      Object.keys(data).forEach(h => data[h].forEach(p => people.add(p)));
+      const arr = Array.from(people).sort();
+      if(arr.length === 0){
+        memberList.innerHTML = '<div class="small">Belum ada anggota</div>';
+        return;
+      }
+      arr.forEach(name => {
+        // show name + their hobbies
+        const div = document.createElement('div');
+        div.className = 'member-item';
+        // find hobbies
+        const hobbies = Object.keys(data).filter(h => data[h].has(name)).map(titleCase);
+        div.innerHTML = `<strong>${name}</strong><div class="small" style="margin-top:6px">Hobi: ${hobbies.join(', ')}</div>`;
+        memberList.appendChild(div);
+      });
+    }
+
+    function renderChosen(){
+      chosenDiv.innerHTML = '';
+      selected.forEach(k => {
+        const pill = document.createElement('div');
+        pill.className = 'hobby-pill selected';
+        pill.textContent = titleCase(k);
+        pill.onclick = () => {
+          // unselect when clicked in chosen
+          selected = selected.filter(x => x !== k);
+          renderPalette(); renderChosen();
+        };
+        chosenDiv.appendChild(pill);
+      });
+    }
+
+    // Core operations with sets
+    function opIntersection(keys){
+      if(!keys.length) return new Set();
+      let res = new Set(data[keys[0]]);
+      for(let i=1;i<keys.length;i++){
+        res = new Set([...res].filter(x => data[keys[i]].has(x)));
+      }
+      return res;
+    }
+    function opUnion(keys){
+      const res = new Set();
+      keys.forEach(k => data[k].forEach(p => res.add(p)));
+      return res;
+    }
+    function opDifference(A,B){
+      return new Set([...data[A]].filter(x => !data[B].has(x)));
+    }
+
+    // Render chart (simple text-based bar)
+    function renderChart(){
+      chartDiv.innerHTML = '';
+      const keys = Object.keys(data).sort((a,b)=> data[b].size - data[a].size);
+      if(keys.length === 0){ chartDiv.innerHTML = '<div class="small">Belum ada data</div>'; return; }
+      keys.slice(0,10).forEach(k=>{
+        const row = document.createElement('div');
+        row.style.display='flex';row.style.alignItems='center';row.style.gap='8px';row.style.marginBottom='6px';
+        const label = document.createElement('div'); label.style.width='110px'; label.className='small'; label.textContent = titleCase(k);
+        const bar = document.createElement('div'); bar.style.flex='1'; bar.style.height='12px'; bar.style.background='#eef2ff'; bar.style.borderRadius='6px';
+        const fill = document.createElement('div'); fill.style.height='12px'; fill.style.borderRadius='6px';
+        // compute width relative
+        const max = Math.max(...keys.map(x=>data[x].size));
+        const pct = Math.round((data[k].size / (max||1)) * 100);
+        fill.style.width = pct + '%';
+        fill.style.background = 'linear-gradient(90deg,#60a5fa,#2563eb)';
+        bar.appendChild(fill);
+        const cnt = document.createElement('div'); cnt.style.width='40px'; cnt.className='small'; cnt.textContent = data[k].size;
+        row.appendChild(label); row.appendChild(bar); row.appendChild(cnt);
+        chartDiv.appendChild(row);
+      });
+    }
+
+    // Actions
+    document.getElementById('addBtn').addEventListener('click', ()=>{
+      const nameRaw = document.getElementById('nameInput').value;
+      const hobbiesRaw = document.getElementById('hobbiesInput').value;
+      if(!nameRaw || !hobbiesRaw){ alert('Nama dan hobi wajib diisi'); return; }
+      const name = titleCase(nameRaw.trim());
+      const hlist = hobbiesRaw.split(',').map(x=>normalize(x)).filter(Boolean);
+      hlist.forEach(h=>{
+        if(!data[h]) data[h] = new Set();
+        data[h].add(name);
+      });
+      document.getElementById('nameInput').value = '';
+      document.getElementById('hobbiesInput').value = '';
+      renderPalette(); renderMemberList();
+      resultArea.textContent = `Berhasil menambahkan ${name} ke: ${hlist.map(titleCase).join(', ')}`;
+    });
+
+    document.getElementById('resetDb').addEventListener('click', ()=>{
+      if(!confirm('Reset semua data?')) return;
+      for(const k in data) delete data[k];
+      selected = [];
+      renderPalette(); renderMemberList();
+      resultArea.textContent = 'Database di-reset.';
+    });
+
+    // Operations: AND
+    document.getElementById('opAnd').addEventListener('click', ()=>{
+      if(selected.length < 2){ alert('Pilih minimal 2 hobi untuk AND (irisan).'); return; }
+      const res = opIntersection(selected);
+      resultArea.textContent = `Irisan (${selected.map(titleCase).join(' ∩ ')}):\n\n` + (Array.from(res).sort().join(', ') || '(kosong)');
+    });
+    // OR
+    document.getElementById('opOr').addEventListener('click', ()=>{
+      if(selected.length < 1){ alert('Pilih minimal 1 hobi untuk OR (gabungan).'); return; }
+      const res = opUnion(selected);
+      resultArea.textContent = `Gabungan (${selected.map(titleCase).join(' ∪ ')}):\n\n` + (Array.from(res).sort().join(', ') || '(kosong)');
+    });
+    // A - B
+    document.getElementById('opDiff').addEventListener('click', ()=>{
+      if(selected.length < 2){ alert('Pilih 2 hobi (A lalu B) untuk A − B.'); return; }
+      const A = selected[0], B = selected[1];
+      const res = opDifference(A,B);
+      resultArea.textContent = `${titleCase(A)} − ${titleCase(B)}:\n\n` + (Array.from(res).sort().join(', ') || '(kosong)');
+    });
+
+    // Copy result
+    document.getElementById('copyResult').addEventListener('click', ()=>{
+      navigator.clipboard?.writeText(resultArea.textContent).then(()=>alert('Hasil disalin ke clipboard.'));
+    });
+
+    // Show stats (detailed)
+    document.getElementById('showCount').addEventListener('click', ()=>{
+      const lines = Object.keys(data).sort((a,b)=>a.localeCompare(b)).map(k=> `${titleCase(k)}: ${data[k].size}`);
+      resultArea.textContent = 'Jumlah per hobi:\n\n' + (lines.join('\n') || '(kosong)');
+    });
+
+    // Export JSON
+    document.getElementById('exportBtn').addEventListener('click', ()=>{
+      const payload = {};
+      Object.keys(data).forEach(k => payload[k] = Array.from(data[k]).sort());
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'data_hobi.json'; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Import JSON
+    document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('fileInput').click());
+    document.getElementById('fileInput').addEventListener('change', (ev)=>{
+      const f = ev.target.files[0]; if(!f) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const obj = JSON.parse(e.target.result);
+          // merge into data (preserve existing)
+          Object.keys(obj).forEach(k=>{
+            const nk = normalize(k);
+            if(!data[nk]) data[nk] = new Set();
+            obj[k].forEach(name => data[nk].add(titleCase(name)));
+          });
+          renderPalette(); renderMemberList();
+          resultArea.textContent = 'Impor berhasil (digabung ke data saat ini).';
+        } catch(err){
+          alert('File JSON tidak valid.');
+        }
+      };
+      reader.readAsText(f);
+      ev.target.value = '';
+    });
+
+    // Pre-fill small demo dataset (optional)
+    (function demo(){
+      const sample = {
+        'membaca': ['Anna','Budi','Citra','Dewi'],
+        'game': ['Budi','Citra','Edo','Fani'],
+        'coding': ['Anna','Edo','Gilang'],
+        'memasak': ['Citra','Dewi','Hani']
+      };
+      Object.keys(sample).forEach(k => data[k] = new Set(sample[k]));
+      renderPalette(); renderMemberList();
+      resultArea.textContent = 'Demo data dimuat. Klik hobi pada palet untuk mencoba operasi.';
+    })();
+
+  </script>
+</body>
+</html>
